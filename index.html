@@ -166,9 +166,9 @@ canvas {
 <canvas id="chart"></canvas>
 
 <script>
-// ===============================
+
 // PARAMETERS + UI
-// ===============================
+
 
 const sliders = ["mu_max","Ks","kd","Yxs","alpha","beta"];
 
@@ -187,9 +187,9 @@ function getParams() {
     return p;
 }
 
-// ===============================
+
 // MODEL (Monod + Luedeking-Piret)
-// ===============================
+
 
 function derivatives(state, params) {
     let [X, S, P] = state;
@@ -203,9 +203,9 @@ function derivatives(state, params) {
     return [dX, dS, dP];
 }
 
-// ===============================
+
 // RK4 SOLVER
-// ===============================
+
 
 function rk4Step(state, dt, params) {
     let k1 = derivatives(state, params);
@@ -224,9 +224,9 @@ function rk4Step(state, dt, params) {
     );
 }
 
-// ===============================
+
 // SIMULATION
-// ===============================
+
 
 function runSimulation(params) {
     let dt = 0.1; // hours
@@ -251,9 +251,9 @@ function runSimulation(params) {
     return {time, X, S, P};
 }
 
-// ===============================
+
 // CHART
-// ===============================
+
 
 const ctx = document.getElementById("chart").getContext("2d");
 
@@ -340,9 +340,9 @@ function update() {
 
     chart.update();
 
-// ===============================
-// LIVE VALUES DISPLAY
-// ===============================
+
+// Live Values Display
+
 
 let lastIndex = result.time.length - 1;
 
@@ -360,9 +360,9 @@ document.getElementById("S_val").innerText = S.toFixed(2);
 document.getElementById("P_val").innerText = P.toFixed(2);
 document.getElementById("time_val").innerText = result.time[lastIndex].toFixed(1);
 
-// ===============================
-// PHASE DETECTION
-// ===============================
+
+// Phase Detection
+
 
 let phase = "";
 
@@ -375,9 +375,9 @@ document.getElementById("phase").innerText = phase;
 
 }
 
-// ===============================
+
 // EVENTS
-// ===============================
+
 
 sliders.forEach(id => {
     document.getElementById(id).addEventListener("input", update);
