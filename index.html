@@ -37,10 +37,10 @@ h3 {
 
 .controls {
     display: flex;
-    height: 770px;
+    height: 780px;
     flex-direction: column;
     background: #2a2a2a;
-    padding: 15px;
+    padding: 10px;
     border-radius: 10px;
     color: white;
 
@@ -69,7 +69,7 @@ label:last-of-type {
 }
 
 input[type=range] {
-    width: 100%;
+    width: 90%;
     accent-color: #16e6df;
 }
 
@@ -229,7 +229,7 @@ function rk4Step(state, dt, params) {
 // ===============================
 
 function runSimulation(params) {
-    let dt = 0.1;
+    let dt = 0.1; // hours
     let t_end = 50;
 
     let time = [];
