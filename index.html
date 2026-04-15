@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bioreactor Simulator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: Calibri;
+    background: #1e1e1e;
+    color: white;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+h3 {
+    color: #16e6df;
+    margin-top: 20px;
+    margin-bottom: 5px;
+    padding-top: 10px;
+    padding-left: 15px;
+    padding-bottom: 0px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+
+.container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.controls {
+    display: flex;
+    height: 770px;
+    flex-direction: column;
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+
+        /* BEVEL EFFECT */
+    box-shadow:
+        inset 2px 2px 5px rgba(255,255,255,0.05),
+        inset -2px -2px 5px rgba(0,0,0,0.5),
+        2px 2px 10px rgba(0,0,0,0.5);
+}
+
+.controls h3:first-of-type {
+    margin-top: 10px;
+}
+
+label {
+    display: block;
+    margin-bottom: 10px;
+}
+
+label:first-of-type {
+    margin-top: 5px;
+}
+
+label:last-of-type {
+    margin-bottom: 2px;
+}
+
+input[type=range] {
+    width: 100%;
+    accent-color: #16e6df;
+}
+
+.value {
+    font-size: 0.9em;
+    color: #555;
+}
+
+canvas {
+    background: #2a2a2a;
+    border-radius: 10px;
+    padding: 10px;
+
+    width: 100% !important;
+    height: 800px !important;
+
+    box-shadow:
+        inset 2px 2px 5px rgba(255,255,255,0.05),
+        inset -2px -2px 5px rgba(0,0,0,0.6),
+        2px 2px 10px rgba(0,0,0,0.6);
+
+}
+#X_val { color: #16e6df; }
+#S_val { color: #a916e6; }
+#P_val { color: #9fe616; }
+#mu_val { color: #ffffff; font-weight: bold; }
+
+.live-box {
+    background: #1f1f1f;
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+    padding-left: 15px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    border-radius: 8px;
+    box-shadow: inset 0px 0px 5px rgba(255,255,255,0.05),
+                inset -2px -2px 5px rgba(0,0,0,0.6);
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>Bioreactor Simulator</h1>
+
+<div class="container">
+
+<div class="controls">
+    <label>Maximum Growth Rate (μmax): <span id="mu_max_val"></span>
+        <input type="range" id="mu_max" min="0.1" max="1" step="0.01" value="0.4">
+    </label>
+
+    <label>Half-Saturation Constant (Ks): <span id="Ks_val"></span>
+        <input type="range" id="Ks" min="0.1" max="10" step="0.1" value="2">
+    </label>
+
+    <label>Cell Death Rate Constant (kd): <span id="kd_val"></span>
+        <input type="range" id="kd" min="0" max="0.1" step="0.001" value="0.01">
+    </label>
+
+    <label>Biomass Yield (Yxs): <span id="Yxs_val"></span>
+        <input type="range" id="Yxs" min="0.05" max="1" step="0.01" value="0.1">
+    </label>
+
+    <label>Growth-Associated Product Constant (α): <span id="alpha_val"></span>
+        <input type="range" id="alpha" min="0" max="5" step="0.1" value="4">
+    </label>
+
+    <label>Non-Growth Product Constant (β): <span id="beta_val"></span>
+        <input type="range" id="beta" min="0" max="1" step="0.01" value="0.1">
+    </label>
+
+
+<h3>Live Values</h3>
+
+<div class="live-box">
+<p>Growth Rate (μ): <span id="mu_val"></span></p>
+<p>Biomass (X): <span id="X_val"></span></p>
+<p>Substrate (S): <span id="S_val"></span></p>
+<p>Product (P): <span id="P_val"></span></p>
+</div>
+
+<h3>System State</h3>
+
+<div class="live-box">
+<p>Phase: <span id="phase"></span></p>
+<p>Time: <span id="time_val"></span></p>
+</div>
+
+</div>
+
+<canvas id="chart"></canvas>
+
+<script>
+// ===============================
+// PARAMETERS + UI
+// ===============================
+
+const sliders = ["mu_max","Ks","kd","Yxs","alpha","beta"];
+
+function getParams() {
+    let p = {};
+    sliders.forEach(id => {
+        p[id] = parseFloat(document.getElementById(id).value);
+        document.getElementById(id + "_val").innerText = p[id];
+    });
+
+    // fixed initial conditions
+    p.X0 = 0.5;
+    p.S0 = 100;
+    p.P0 = 0;
+
+    return p;
+}
+
+// ===============================
+// MODEL (Monod + Luedeking-Piret)
+// ===============================
+
+function derivatives(state, params) {
+    let [X, S, P] = state;
+
+    let mu = params.mu_max * S / (params.Ks + S);
+
+    let dX = (mu - params.kd) * X;
+    let dS = -(1 / params.Yxs) * mu * X;
+    let dP = params.alpha * dX + params.beta * X;
+
+    return [dX, dS, dP];
+}
+
+// ===============================
+// RK4 SOLVER
+// ===============================
+
+function rk4Step(state, dt, params) {
+    let k1 = derivatives(state, params);
+
+    let s2 = state.map((v,i) => v + k1[i]*dt/2);
+    let k2 = derivatives(s2, params);
+
+    let s3 = state.map((v,i) => v + k2[i]*dt/2);
+    let k3 = derivatives(s3, params);
+
+    let s4 = state.map((v,i) => v + k3[i]*dt);
+    let k4 = derivatives(s4, params);
+
+    return state.map((v,i) =>
+        v + dt/6 * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i])
+    );
+}
+
+// ===============================
+// SIMULATION
+// ===============================
+
+function runSimulation(params) {
+    let dt = 0.1;
+    let t_end = 50;
+
+    let time = [];
+    let X = [];
+    let S = [];
+    let P = [];
+
+    let state = [params.X0, params.S0, params.P0];
+
+    for (let t = 0; t <= t_end; t += dt) {
+        time.push(t);
+        X.push(state[0]);
+        S.push(state[1]);
+        P.push(state[2]);
+
+        state = rk4Step(state, dt, params);
+    }
+
+    return {time, X, S, P};
+}
+
+// ===============================
+// CHART
+// ===============================
+
+const ctx = document.getElementById("chart").getContext("2d");
+
+const chart = new Chart(ctx, {
+    type: "line",
+
+    data: {
+        labels: [],
+        datasets: [
+    {
+        label: "Biomass (X)",
+        borderColor: "#16e6df",
+        borderWidth: 2,
+        data: [],
+        tension: 0.3
+    },
+    {
+        label: "Substrate (S)",
+        borderColor: "#a916e6",
+        borderWidth: 2,
+        data: [],
+        tension: 0.3
+    },
+    {
+        label: "Product (P)",
+        borderColor: "#9fe616",
+        borderWidth: 2,
+        data: [],
+        tension: 0.3
+    }
+]
+    },
+    options: {
+    maintainAspectRatio: false,
+    responsive: true,
+    animation: false,
+
+    plugins: {
+        legend: {
+            labels: {
+                color: "white",
+                font: {
+        size: 16
+    }
+            }
+        }
+    },
+
+    scales: {
+        x: {
+            title: {
+                display: true,
+                text: "Time",
+                color: "white"
+            },
+            ticks: {
+                maxTicksLimit: 6,
+                color: "white"
+            }
+        },
+        y: {
+            title: {
+                display: true,
+                text: "Concentration",
+                color: "white"
+            },
+            ticks: {
+                color: "white"
+            }
+        }
+    }
+}
+});
+
+
+function update() {
+    let params = getParams();
+    let result = runSimulation(params);
+
+    chart.data.labels = result.time;
+    chart.data.datasets[0].data = result.X;
+    chart.data.datasets[1].data = result.S;
+    chart.data.datasets[2].data = result.P;
+
+    chart.update();
+
+// ===============================
+// LIVE VALUES DISPLAY
+// ===============================
+
+let lastIndex = result.time.length - 1;
+
+let X = result.X[lastIndex];
+let S = result.S[lastIndex];
+let P = result.P[lastIndex];
+
+// Monod growth rate
+let mu = params.mu_max * S / (params.Ks + S);
+
+// Update UI
+document.getElementById("mu_val").innerText = mu.toFixed(3);
+document.getElementById("X_val").innerText = X.toFixed(2);
+document.getElementById("S_val").innerText = S.toFixed(2);
+document.getElementById("P_val").innerText = P.toFixed(2);
+document.getElementById("time_val").innerText = result.time[lastIndex].toFixed(1);
+
+// ===============================
+// PHASE DETECTION
+// ===============================
+
+let phase = "";
+
+if (mu < 0.05) phase = "Lag Phase";
+else if (S > 10) phase = "Exponential Growth";
+else if (S > 1) phase = "Late Growth";
+else phase = "Stationary Phase";
+
+document.getElementById("phase").innerText = phase;
+
+}
+
+// ===============================
+// EVENTS
+// ===============================
+
+sliders.forEach(id => {
+    document.getElementById(id).addEventListener("input", update);
+});
+
+// initial run
+update();
+
+</script>
+
+</body>
+</html>
